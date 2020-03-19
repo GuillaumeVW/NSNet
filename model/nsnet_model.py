@@ -17,7 +17,7 @@ from dataloader.wav_dataset import WAVDataset
 import pytorch_lightning as pl
 
 
-class EHNetModel(pl.LightningModule):
+class NSNetModel(pl.LightningModule):
     """
     Sample model to show how to define a template
     Input size: (batch_size, frequency_bins, time)
@@ -31,7 +31,7 @@ class EHNetModel(pl.LightningModule):
         :param hparams:
         """
         # init superclass
-        super(EHNetModel, self).__init__()
+        super(NSNetModel, self).__init__()
 
         self.hparams = hparams
         self.train_dir = Path(self.hparams.train_dir)
