@@ -44,9 +44,9 @@ class WAVDataset(Dataset):
 
         assert clean_waveform.shape[0] == 1 and noisy_waveform.shape[0] == 1, 'WAV file is not single channel!'
 
-        window = torch.hann_window(self.n_fft)
-        x_stft = torch.stft(noisy_waveform.view(-1), n_fft=self.n_fft, hop_length=self.n_fft // 2, win_length=self.n_fft, window=window)
-        y_stft = torch.stft(clean_waveform.view(-1), n_fft=self.n_fft, hop_length=self.n_fft // 2, win_length=self.n_fft, window=window)
+        window = torch.hamming_window(self.n_fft)
+        x_stft = torch.stft(noisy_waveform.view(-1), n_fft=self.n_fft, hop_length=self.n_fft // 4, win_length=self.n_fft, window=window)
+        y_stft = torch.stft(clean_waveform.view(-1), n_fft=self.n_fft, hop_length=self.n_fft // 4, win_length=self.n_fft, window=window)
 
         x_ps = x_stft.pow(2).sum(-1)
         x_lps = LogTransform()(x_ps)
