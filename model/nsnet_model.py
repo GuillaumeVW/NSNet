@@ -23,9 +23,8 @@ class NSNetModel(pl.LightningModule):
     Input size: (batch_size, frequency_bins, time)
     """
 
-    def __init__(self, hparams=Namespace(**{'train_dir': None, 'val_dir': None, 'batch_size': 4, 'n_frequency_bins': 256, 'n_kernels': 256,
-                                            'kernel_size_f': 32, 'kernel_size_t': 11, 'n_lstm_layers': 2, 'n_lstm_units': 1024, 'lstm_dropout': 0,
-                                            'alpha': 0.35})):
+    def __init__(self, hparams=Namespace(**{'train_dir': None, 'val_dir': None, 'batch_size': 4, 'n_fft': 512,
+                                            'n_gru_layers': 3, 'gru_dropout': 0, 'alpha': 0.35})):
         """
         Pass in parsed HyperOptArgumentParser to the model
         :param hparams:
@@ -37,14 +36,10 @@ class NSNetModel(pl.LightningModule):
         self.train_dir = Path(self.hparams.train_dir)
         self.val_dir = Path(self.hparams.val_dir)
         self.batch_size = self.hparams.batch_size
-        self.n_frequency_bins = self.hparams.n_frequency_bins
-        self.n_kernels = self.hparams.n_kernels
-        self.kernel_size = (self.hparams.kernel_size_f, self.hparams.kernel_size_t)
-        self.stride = (self.kernel_size[0] // 2, 1)
-        self.padding = (self.kernel_size[1] // 2, self.kernel_size[1] // 2)
-        self.n_lstm_layers = self.hparams.n_lstm_layers
-        self.n_lstm_units = self.hparams.n_lstm_units
-        self.lstm_dropout = self.hparams.lstm_dropout
+        self.n_fft = self.hparams.n_fft
+        self.n_frequency_bins = self.n_fft // 2 + 1
+        self.n_gru_layers = self.hparams.n_gru_layers
+        self.gru_dropout = self.hparams.gru_dropout
         self.alpha = self.hparams.alpha
 
         # build model
@@ -58,15 +53,9 @@ class NSNetModel(pl.LightningModule):
         Layout model
         :return:
         """
-        self.conv = nn.Conv2d(in_channels=1, out_channels=self.n_kernels,
-                              kernel_size=self.kernel_size, stride=self.stride,
-                              padding=self.padding)
-        self.batchnorm = nn.BatchNorm2d(num_features=self.n_kernels)
-        n_features = int(self.n_kernels * (((self.n_frequency_bins - self.kernel_size[0] + 2 * self.padding[0]) // self.stride[0]) + 1))
-        self.lstm = nn.LSTM(input_size=n_features, hidden_size=self.n_lstm_units, num_layers=self.n_lstm_layers,
-                            batch_first=True, dropout=self.lstm_dropout, bidirectional=True)
-        self.dense = nn.Linear(in_features=2 * self.n_lstm_units, out_features=self.n_frequency_bins)
-        self.flatten = nn.Flatten(start_dim=2)
+        self.gru = nn.GRU(input_size=self.n_frequency_bins, hidden_size=self.n_frequency_bins, num_layers=self.n_gru_layers,
+                          batch_first=True, dropout=self.gru_dropout)
+        self.dense = nn.Linear(in_features=self.n_frequency_bins, out_features=self.n_frequency_bins)
 
     # ---------------------
     # TRAINING
@@ -77,12 +66,8 @@ class NSNetModel(pl.LightningModule):
         :param x:
         :return:
         """
-        x = torch.unsqueeze(x, 1)  # (batch_size, 1, frequency_bins, time)
-        x = F.relu(self.conv(x))  # (batch_size, n_kernels, n_features, time)
-        x = self.batchnorm(x)  # (batch_size, n_kernels, n_features, time)
-        x = x.permute(0, 3, 1, 2)  # (batch_size, time, n_kernels, n_features)
-        x = self.flatten(x)  # (batch_size, time, n_kernels * n_features)
-        x, _ = self.lstm(x)  # (batch_size, time, 2 * n_lstm_units)
+        x = x.permute(0, 2, 1)  # (batch_size, time, n_frequency_bins)
+        x, _ = self.gru(x)  # (batch_size, time, n_frequency_bins)
         x = torch.sigmoid(self.dense(x))  # (batch_size, time, frequency_bins)
         x = x.permute(0, 2, 1)  # (batch_size, frequency_bins, time)
 
@@ -172,18 +157,17 @@ class NSNetModel(pl.LightningModule):
         return whatever optimizers we want here
         :return: list of optimizers
         """
-        optimizer = optim.Adadelta(self.parameters(), lr=1.0, weight_decay=0.0005)
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[60, 120], gamma=0.1)
+        optimizer = optim.Adam(self.parameters(), weight_decay=0.0005)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, verbose=True, min_lr=1e-5)
         return [optimizer], [scheduler]
 
     def __dataloader(self, train):
         # init data generators
 
-        n_fft = (self.n_frequency_bins - 1) * 2
         if train:
-            dataset = WAVDataset(self.train_dir, n_fft=n_fft)
+            dataset = WAVDataset(self.train_dir, n_fft=self.n_fft)
         else:
-            dataset = WAVDataset(self.val_dir, n_fft=n_fft)
+            dataset = WAVDataset(self.val_dir, n_fft=self.n_fft)
 
         loader = DataLoader(
             dataset=dataset,
