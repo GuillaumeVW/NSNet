@@ -1,10 +1,11 @@
+import math
 import os
 from pathlib import Path
 
+import numpy as np
 import torch
 import torchaudio
 from torch.utils.data import Dataset
-import numpy as np
 
 torchaudio.set_audio_backend("soundfile")  # default backend (SoX) has bugs when loading WAVs
 
@@ -29,9 +30,19 @@ class WAVDataset(Dataset):
         for i, filename in enumerate(sorted(os.listdir(self.noisy_dir))):
             self.noisy_WAVs[i] = self.noisy_dir.joinpath(filename)
 
+        # VAD
         step = 16000 / self.n_fft
         frequency_bins = np.arange(0, (self.n_fft // 2 + 1) * step, step=step)
         self.VAD_frequencies = np.where((frequency_bins >= 300) & (frequency_bins <= 5000), True, False)
+
+        # mean normalization
+        frameshift = (self.n_fft / 16000) / 4  # frameshift between STFT frames
+        t_init = 0.1  # init time
+        tauFeat = 3  # time constant
+        tauFeatInit = 0.1  # time constant during init
+        self.n_init_frames = math.ceil(t_init / frameshift)
+        self.alpha_feat_init = math.exp(-frameshift / tauFeatInit)
+        self.alpha_feat = math.exp(-frameshift / tauFeat)
 
     def __len__(self):
         return len(self.noisy_WAVs)
@@ -66,7 +77,29 @@ class WAVDataset(Dataset):
         y_peak_energy = y_energy_filtered_averaged.max()
         VAD = torch.where(y_energy_filtered_averaged > y_peak_energy / 1000, torch.ones_like(y_energy_filtered), torch.zeros_like(y_energy_filtered))
         VAD = VAD.bool()
-        
+
+        # mean normalization
+        frames = []
+        x_lps = x_lps.transpose(0, 1)  # (time, frequency)
+        n_init_frames = self.n_init_frames
+        alpha_feat_init = self.alpha_feat_init
+        alpha_feat = self.alpha_feat
+        for frame_counter, frame_feature in enumerate(x_lps):
+            if frame_counter < n_init_frames:
+                alpha = alpha_feat_init
+            else:
+                alpha = alpha_feat
+            if frame_counter == 0:
+                mu = frame_feature
+                sigmasquare = frame_feature.pow(2)
+            mu = alpha * mu + (1 - alpha) * frame_feature
+            sigmasquare = alpha * sigmasquare + (1 - alpha) * frame_feature.pow(2)
+            sigma = torch.sqrt(torch.clamp(sigmasquare - mu.pow(2), min=1e-12))  # limit for sqrt
+            norm_feature = (frame_feature - mu) / sigma
+            frames.append(norm_feature)
+
+        x_lps = torch.stack(frames, dim=0).transpose(0, 1)   # (frequency, time)
+
         return x_lps, x_ms, y_ms, VAD
     
     def __moving_average(self, a, n=3):
