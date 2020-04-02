@@ -157,8 +157,8 @@ class NSNetModel(pl.LightningModule):
         return whatever optimizers we want here
         :return: list of optimizers
         """
-        optimizer = optim.Adam(self.parameters(), weight_decay=0.0005)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, verbose=True, min_lr=1e-5)
+        optimizer = optim.Adam(self.parameters(), lr=1e-4, weight_decay=0.0005)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, verbose=True, min_lr=1e-6)
         return [optimizer], [scheduler]
 
     def __dataloader(self, train):
