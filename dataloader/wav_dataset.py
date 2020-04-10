@@ -14,10 +14,11 @@ class WAVDataset(Dataset):
     """
     Create a PyTorch Dataset object from a directory containing clean and noisy WAV files
     """
-    def __init__(self, dir: Path, n_fft):
+    def __init__(self, dir: Path, n_fft, test=False):
         self.clean_dir = dir.joinpath('clean')
         self.noisy_dir = dir.joinpath('noisy')
         self.n_fft = n_fft
+        self.test = test
 
         assert os.path.exists(self.clean_dir), 'No clean WAV file folder found!'
         assert os.path.exists(self.noisy_dir), 'No noisy WAV file folder found!'
@@ -100,7 +101,10 @@ class WAVDataset(Dataset):
 
         x_lps = torch.stack(frames, dim=0).transpose(0, 1)   # (frequency, time)
 
-        return x_lps, x_ms, y_ms, VAD
+        if not self.test:
+            return x_lps, x_ms, y_ms, VAD
+        if self.test:
+            return noisy_waveform.view(-1), clean_waveform.view(-1), x_stft, y_stft, x_lps, x_ms, y_ms, VAD
     
     def __moving_average(self, a, n=3):
         ret = torch.cumsum(a, dim=0)
