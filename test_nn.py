@@ -26,7 +26,6 @@ torch.set_grad_enabled(False)
 
 gain_mask = model(x_lps)
 y_spectrogram_hat = x_ms * gain_mask
-y_spectrogram_hat = y_spectrogram_hat.transpose(2, 1)  # (batch, frequency, time)
 
 y_stft_hat = torch.stack([y_spectrogram_hat * torch.cos(angle(x_stft)),
                           y_spectrogram_hat * torch.sin(angle(x_stft))], dim=-1)
