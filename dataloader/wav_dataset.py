@@ -71,6 +71,8 @@ class WAVDataset(Dataset):
         x_ms = x_ps.sqrt()
         y_ms = y_stft.pow(2).sum(-1).sqrt()
 
+        noise_ms = (x_stft - y_stft).pow(2).sum(-1).sqrt()
+
         # VAD
         y_ms_filtered = y_ms[self.VAD_frequencies]
         y_energy_filtered = y_ms_filtered.pow(2).mean(dim=0)
@@ -102,7 +104,7 @@ class WAVDataset(Dataset):
         x_lps = torch.stack(frames, dim=0).transpose(0, 1)   # (frequency, time)
 
         if not self.test:
-            return x_lps, x_ms, y_ms, VAD
+            return x_lps, x_ms, y_ms, noise_ms, VAD
         if self.test:
             return noisy_waveform.view(-1), clean_waveform.view(-1), x_stft, y_stft, x_lps, x_ms, y_ms, VAD
     

@@ -84,8 +84,7 @@ class NSNetModel(pl.LightningModule):
         :return:
         """
         # forward pass
-        x_lps, x_ms, y_ms, VAD = batch
-        noise_ms = x_ms - y_ms
+        x_lps, x_ms, y_ms, noise_ms, VAD = batch
         VAD_expanded = torch.unsqueeze(VAD, dim=1).expand_as(y_ms)
 
         y_hat = self.forward(x_lps)
@@ -111,8 +110,7 @@ class NSNetModel(pl.LightningModule):
         :return:
         """
         # forward pass
-        x_lps, x_ms, y_ms, VAD = batch
-        noise_ms = x_ms - y_ms
+        x_lps, x_ms, y_ms, noise_ms, VAD = batch
         VAD_expanded = torch.unsqueeze(VAD, dim=1).expand_as(y_ms)
 
         y_hat = self.forward(x_lps)
