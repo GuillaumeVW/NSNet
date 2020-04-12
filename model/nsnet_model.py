@@ -23,7 +23,7 @@ class NSNetModel(pl.LightningModule):
     Input size: (batch_size, frequency_bins, time)
     """
 
-    def __init__(self, hparams=Namespace(**{'train_dir': None, 'val_dir': None, 'batch_size': 4, 'n_fft': 512,
+    def __init__(self, hparams=Namespace(**{'train_dir': Path(), 'val_dir': Path(), 'batch_size': 4, 'n_fft': 512,
                                             'n_gru_layers': 3, 'gru_dropout': 0, 'alpha': 0.35})):
         """
         Pass in parsed HyperOptArgumentParser to the model
