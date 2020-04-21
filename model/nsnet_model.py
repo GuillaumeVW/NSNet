@@ -2,19 +2,18 @@
 Example template for defining a system
 """
 import logging as log
+from argparse import Namespace
 from collections import OrderedDict
 from pathlib import Path
-from argparse import Namespace
 
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from torch.utils.data import DataLoader
+
 from dataloader.wav_dataset import WAVDataset
-
-
-import pytorch_lightning as pl
 
 
 class NSNetModel(pl.LightningModule):
@@ -155,8 +154,8 @@ class NSNetModel(pl.LightningModule):
         return whatever optimizers we want here
         :return: list of optimizers
         """
-        optimizer = optim.Adam(self.parameters(), lr=1e-4, weight_decay=0.0005)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, verbose=True, min_lr=1e-6)
+        optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, verbose=True, min_lr=1e-6, patience=5)
         return [optimizer], [scheduler]
 
     def __dataloader(self, train):
@@ -171,7 +170,7 @@ class NSNetModel(pl.LightningModule):
             dataset=dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=4,
+            num_workers=24,
         )
 
         return loader
