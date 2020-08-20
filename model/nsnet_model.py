@@ -1,6 +1,3 @@
-"""
-Example template for defining a system
-"""
 import logging as log
 from argparse import Namespace
 from collections import OrderedDict
@@ -17,18 +14,8 @@ from dataloader.wav_dataset import WAVDataset
 
 
 class NSNetModel(pl.LightningModule):
-    """
-    Sample model to show how to define a template
-    Input size: (batch_size, frequency_bins, time)
-    """
-
     def __init__(self, hparams=Namespace(**{'train_dir': Path(), 'val_dir': Path(), 'batch_size': 4, 'n_fft': 512,
                                             'n_gru_layers': 3, 'gru_dropout': 0, 'alpha': 0.35})):
-        """
-        Pass in parsed HyperOptArgumentParser to the model
-        :param hparams:
-        """
-        # init superclass
         super(NSNetModel, self).__init__()
 
         self.hparams = hparams
@@ -60,11 +47,6 @@ class NSNetModel(pl.LightningModule):
     # TRAINING
     # ---------------------
     def forward(self, x):
-        """
-        No special modification required for lightning, define as you normally would
-        :param x:
-        :return:
-        """
         x = x.permute(0, 2, 1)  # (batch_size, time, n_frequency_bins)
         x, _ = self.gru(x)  # (batch_size, time, n_frequency_bins)
         x = torch.sigmoid(self.dense(x))  # (batch_size, time, frequency_bins)
@@ -77,11 +59,6 @@ class NSNetModel(pl.LightningModule):
         return loss
 
     def training_step(self, batch, batch_idx):
-        """
-        Lightning calls this inside the training loop
-        :param batch:
-        :return:
-        """
         # forward pass
         x_lps, x_ms, y_ms, noise_ms, VAD = batch
         VAD_expanded = torch.unsqueeze(VAD, dim=1).expand_as(y_ms)
@@ -103,11 +80,6 @@ class NSNetModel(pl.LightningModule):
         return output
 
     def validation_step(self, batch, batch_idx):
-        """
-        Lightning calls this inside the validation loop
-        :param batch:
-        :return:
-        """
         # forward pass
         x_lps, x_ms, y_ms, noise_ms, VAD = batch
         VAD_expanded = torch.unsqueeze(VAD, dim=1).expand_as(y_ms)
@@ -127,15 +99,6 @@ class NSNetModel(pl.LightningModule):
         return output
 
     def validation_epoch_end(self, outputs):
-        """
-        Called at the end of validation to aggregate outputs
-        :param outputs: list of individual outputs of each validation step
-        :return:
-        """
-        # if returned a scalar from validation_step, outputs is a list of tensor scalars
-        # we return just the average in this case (if we want)
-        # return torch.stack(outputs).mean()
-
         val_loss_mean = 0
         for output in outputs:
             val_loss = output['val_loss']
@@ -150,10 +113,6 @@ class NSNetModel(pl.LightningModule):
     # TRAINING SETUP
     # ---------------------
     def configure_optimizers(self):
-        """
-        return whatever optimizers we want here
-        :return: list of optimizers
-        """
         optimizer = optim.Adam(self.parameters(), lr=1e-3)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, verbose=True, min_lr=1e-6, patience=5)
         return [optimizer], [scheduler]
